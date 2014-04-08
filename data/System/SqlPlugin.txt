@@ -1,0 +1,141 @@
+%META:TOPICINFO{author="ProjectContributor" comment="autosave" date="1356278780" format="1.1" version="4"}%
+---+!! %TOPIC%
+
+%TOC%
+
+This plugin adds access to SQL databases using wiki apps. 
+
+---++ Syntax
+
+---+++ SQL
+
+Executes an SQL statement. This can be either a select or any other SQL statement.
+The result of a select can be stored under a specific id to reuse it in further =SQLFORMAT= statements (see below).
+
+=%<nop>SQL{"query" ...parameter ...}%=
+
+| *Parameter* | *Description* | *Default* |
+| query | sql statement to be executed | | 
+| params | comma separated list of bind parameters for placeholders (?) in query | | 
+| database | connection to be used | first database in connection pool |
+| id | identifies the query result to be reusable via SQLFORMAT | |
+| decode | values are "url" or "entity"; specifies the encoding of the query before being executed | none |
+| format | format string to render each hit of a search result | =$id= |
+| header | header srting prepended to the rendered result | |
+| footer | footer string appended to the rendered result | |
+| separator | separator to be put in between each hit rendered using the =format= parameter | =,= (comma) |
+| hidenull | values are "on" or "off": flag to hide any rendered result when an sql search returned no hit; =off= means any output will be suppressed when nothing was found; =on= means that a header and footer will always be printed no matter how many hits have been found | =off= |
+| limit | maximum number of search hits to render; a 0 (zero) will render all hits found | 0 |
+| skip | skip the number of hits before starting to render the search result | 0 |
+
+If =format=, =header= and =footer= are all undefined, a standard foswiki-table will be generated.
+
+---+++ SQLFORMAT
+
+Format the result of a previous =%SQL= select.
+
+=%<nop>SQLFORMAT{"id" ...parameter...}%=
+
+| *Parameter* | *Description* | *Default* |
+| id | identifies the result set as given to =%SQL= | |
+| continue | valies are "on" or "off"; when switched on, a previously used statetment in =%SQL= will be reused; if switched off, the statement as specified by the corresponding =%SQL= will be executed again by the database engine | off |
+| =format=, %BR% \
+  =header=, %BR% \
+  =footer=, %BR% \
+  =hidenull=, %BR% \
+  =skip=, %BR% \
+  =limit= | see above | |
+
+The =format= parameter may contain variables of the form =$colname=, where =colname= is the name of the column as returned by an sql select. Standard escapes like =$percnt=, =$nop=, =$n= and =$dollar= can be used in =format=, =header=, =footer= and =separator= to delay the execution on TML until after the =%SQL= statement has finished.
+
+---++ Configuring database connections
+
+Connections to a database are configured by specifying a list of connections in =[[%SCRIPTURLPATH{configure}%][configure]]=. It is stored in an array in the variable =$Foswiki::cfg{SqlPlugin}{Databases}=. 
+
+Example:
+
+<verbatim>
+$Foswiki::cfg{SqlPlugin}{Databases} = [
+  {
+    'id' => 'mysql',
+    'dsn' => 'dbi:mysql:foswiki:localhost',
+    'username' => 'foswiki_user',
+    'password' => 'foswiki_password',
+  },
+  {
+    'id' => 'sqlite',
+    'dsn' => 'dbi:SQLite:dbname=/var/www/foswiki/working/work_areas/SqlPlugin/sqlite.db'
+  },
+  {
+    'id' => 'csv',
+     'dsn' => 'dbi:CSV:f_dir=/vaar/www/foswiki/working/work_areas/SqlPlugin/csv'
+  },
+];
+</verbatim>
+
+This setting configures three connections - known under the ids =mysql=, =sqlite= and =csv= using different drivers.
+The first sets up a connection to a mysql database called "foswiki" on the localhost server, protected by the given user and password settings. The second connects to an sqlite database stored at the given path; the third one connects to a database of CSV files stored at the giveh directory. Note, you will need to make sure that the specified driver in the =dsn= parameter is installed on your system. Please look up the individual driver documentation how to specify a correct value for =dsn=. 
+
+---++ Securing database access
+
+Underneath the database connections section in =[[%SCRIPTURLPATH{configure}%][configure]]=, there is a section to configure access control.
+Access can be restricted by wiki user / group, by a 'whitelist' of permitted queries, or both.  If no access control is specified for
+a database connection, then all access is allowed for that connection.
+
+Here is an example.  Note that the first element of the =queries= list is a regular expression, and
+the rest of the entries are literal string matches.
+
+<verbatim>
+[
+  {
+    'who' => 'KipLubliner',
+    'id' => 'mysql',
+    'queries' => [
+      'SELECT [^;]+',
+      'UPDATE TEAM SET TM_NAME = ? WHERE TMID = ?',
+      'UPDATE PLAYER SET PL_NICKNAME = ?, PL_FIRSTNAME = ?, PL_LASTNAME = ?, PL_TEAM = ? WHERE PLID = ?',
+      'INSERT INTO TEAM( TM_NAME ) VALUES (?)',
+      'INSERT INTO PLAYER( PL_NICKNAME, PL_FIRSTNAME, PL_LASTNAME, PL_TEAM ) VALUES (?, ?, ?, ?)'
+    ]
+  }
+];
+</verbatim>
+
+See the integrated documentation on the configure screen for more details.
+
+---++ Plugin Upgrade Notes
+
+---+++ 1.03
+
+When the database parameter to %<nop>SQL% is present and that value was not present in the =configure= map, 
+previous versions would use the first value listed by default.  Starting with 1.03, the SQL macro call will fail instead.
+The behavior when the database parameter is omitted is unchanged.
+
+---++ Installation Instructions
+
+%$INSTALL_INSTRUCTIONS%
+
+---++ Info
+<!--
+   * Set SHORTDESCRIPTION = SQL interface for Foswiki
+-->
+
+|  Author(s): | Foswiki:MichaelDaum|
+|  Copyright: | &copy; 2009-2014 Michael Daum http://michaeldaumconsulting.com |
+|  License: | [[http://www.gnu.org/licenses/gpl.html][GPL (Gnu General Public License)]] |
+|  Version: | %$VERSION% |
+|  Release: | %$RELEASE% |
+|  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  18 Mar 2014: | (2.00) Foswiki:Tasks/Item12801 - make logging of sql action configurable |
+|  29 Jan 2014: | (1.99) Foswiki:Tasks/Item12245 - enhance handing of bind parameters (Foswiki:Main/FrankHoellering) %BR% \
+                         Foswiki:Tasks/Item12236 - cache bind values to be reused in =continue= mode (Foswiki:Main/FrankHoellering) %BR% \
+                         Foswiki:Tasks/Item12737 - fix oracle long column type (Foswiki:Main/HansJosefKoehler) |
+|  5 Aug 2012:  | (1.03) Foswiki:Tasks/Item12029 - more robust 'database' param handling %BR% \
+                         Foswiki:Tasks/Item12030 - DB errors cause unintended SQL calls %BR% \
+                         Foswiki:Tasks/Item12018 - queries spread across multiple lines %BR% \
+                         Foswiki:Tasks/Item12033 - also log access from API and log access control failures (Foswiki:Main/KipLubliner) |
+|  18 May 2012: | (1.02) Added bind parameters, access control, perl API.  (Foswiki:Main/KipLubliner) |
+|  14 Jun 2010: | removed hard-coded sort of column keys |
+|  Dependencies: | %$DEPENDENCIES% |
+|  Home page: | http://foswiki.org/Extensions/%TOPIC% |
+|  Support page: | http://foswiki.org/Support/%TOPIC% |
